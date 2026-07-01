@@ -110,6 +110,49 @@
   .tab .cnt{opacity:.55;margin-left:5px;font-weight:600;}
   .tab.on .cnt{opacity:.7;}
 
+  /* Search bar */
+  .searchbar{
+    margin:14px 20px 0;background:var(--card);border-radius:14px;box-shadow:var(--shadow);
+    display:flex;align-items:center;gap:8px;padding:0 14px;height:50px;
+  }
+  .searchbar .sic{font-size:16px;opacity:.5;flex:0 0 auto;}
+  .searchbar input{
+    flex:1;border:none;background:none;outline:none;font-size:15px;font-weight:600;color:var(--text);height:100%;
+  }
+  .searchbar input::placeholder{color:var(--text-mute);font-weight:500;}
+  .searchbar .sclear{
+    flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--line-strong);color:#fff;
+    font-size:11px;display:flex;align-items:center;justify-content:center;
+  }
+
+  /* Category chips (filter) */
+  .cat-tabs{padding-top:10px;}
+  .cat-tabs:empty{display:none;padding:0;}
+  .cat-tabs .tab{font-size:13px;padding:8px 14px;}
+  .cat-tabs .tab.on{background:var(--blue);color:#fff;}
+
+  /* Sort + price filter row */
+  .filterrow{display:flex;gap:8px;padding:14px 20px 0;}
+  .selwrap{position:relative;flex:1;}
+  .selwrap::after{
+    content:"▾";position:absolute;right:14px;top:50%;transform:translateY(-50%);
+    font-size:12px;color:var(--text-mute);pointer-events:none;
+  }
+  .selwrap select{
+    width:100%;height:42px;border-radius:12px;background:var(--card);box-shadow:var(--shadow);
+    border:none;outline:none;padding:0 32px 0 14px;font-size:13px;font-weight:700;color:var(--text-sub);
+    -webkit-appearance:none;appearance:none;font-family:inherit;cursor:pointer;letter-spacing:-.01em;
+  }
+
+  /* Category chips inside edit sheet */
+  .cat-chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .cat-chips:empty{display:none;}
+  .cat-chips .cchip{
+    padding:9px 14px;border-radius:12px;background:var(--bg);font-size:14px;font-weight:700;color:var(--text-sub);
+    border:1.5px solid transparent;transition:all .15s ease;
+  }
+  .cat-chips .cchip.on{background:var(--blue-soft);color:var(--blue);border-color:var(--blue);}
+
   /* Grid */
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 20px 0;}
   .doll{
@@ -128,6 +171,7 @@
   .badge.medium{background:var(--blue-soft);color:var(--blue);}
   .badge.large{background:var(--purple-soft);color:var(--purple);}
   .doll .body{padding:12px 13px 14px;}
+  .doll .dcat{font-size:11px;font-weight:700;color:var(--blue);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .doll .nm{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .doll .pr{font-size:16px;font-weight:800;margin-top:5px;letter-spacing:-.02em;}
   .doll .pr.none{color:var(--text-mute);font-weight:600;font-size:13px;}
@@ -167,7 +211,7 @@
 
   /* Photo picker */
   .photobox{
-    width:100%;aspect-ratio:16/11;border-radius:16px;background:var(--bg);
+    width:100%;aspect-ratio:1/1;border-radius:16px;background:var(--bg);
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
     color:var(--text-mute);font-size:14px;font-weight:600;overflow:hidden;position:relative;
     border:1.5px dashed var(--line-strong);
@@ -313,11 +357,41 @@
     </div>
   </div>
 
+  <div class="searchbar">
+    <span class="sic">🔍</span>
+    <input id="searchInput" type="text" placeholder="인형 이름으로 검색" autocomplete="off" />
+    <button id="searchClear" class="sclear" hidden aria-label="검색어 지우기">✕</button>
+  </div>
+
   <div class="tabs" id="tabs">
     <button class="tab on" data-size="all">전체 <span class="cnt" id="c-all">0</span></button>
     <button class="tab" data-size="small">소형 <span class="cnt" id="c-small">0</span></button>
     <button class="tab" data-size="medium">중형 <span class="cnt" id="c-medium">0</span></button>
     <button class="tab" data-size="large">대형 <span class="cnt" id="c-large">0</span></button>
+  </div>
+
+  <div class="tabs cat-tabs" id="catTabs"></div>
+
+  <div class="filterrow">
+    <div class="selwrap">
+      <select id="sortSel" aria-label="정렬">
+        <option value="new">최신순</option>
+        <option value="old">오래된순</option>
+        <option value="price_high">가격 높은순</option>
+        <option value="price_low">가격 낮은순</option>
+        <option value="name">이름순</option>
+      </select>
+    </div>
+    <div class="selwrap">
+      <select id="priceSel" aria-label="가격대">
+        <option value="all">가격대 전체</option>
+        <option value="0-5000">~5,000원</option>
+        <option value="5000-10000">5,000~1만원</option>
+        <option value="10000-30000">1만~3만원</option>
+        <option value="30000-999999999">3만원~</option>
+        <option value="none">가격 미정</option>
+      </select>
+    </div>
   </div>
 
   <div class="grid" id="grid"></div>
@@ -357,6 +431,12 @@
         <button data-size="medium">중형</button>
         <button data-size="large">대형</button>
       </div>
+    </div>
+
+    <div class="field">
+      <label>카테고리 <span style="color:var(--text-mute);font-weight:600;">(선택)</span></label>
+      <div class="cat-chips" id="catChips"></div>
+      <input class="inp" id="catInput" type="text" placeholder="새 카테고리 직접 입력 (예: 산리오)" autocomplete="off" style="margin-top:8px;" />
     </div>
 
     <div class="market">
@@ -441,9 +521,14 @@ function toast(msg){
 /* ---------- State ---------- */
 let dolls=[];
 let filter="all";
+let searchQuery="";
+let categoryFilter="all";
+let priceFilter="all";
+let sortMode="new";
 let editingId=null;
 let draftPhoto=null;
 let draftSize=null;
+let draftCategory="";
 let detailId=null;
 let session=null;
 let authMode="login"; // or "signup"
@@ -589,7 +674,7 @@ async function loadDolls(){
   render();
 }
 function rowToDoll(r){
-  return {id:r.id,name:r.name,size:r.size,price:r.price,photo:r.photo,createdAt:Number(r.created_at)};
+  return {id:r.id,name:r.name,size:r.size,price:r.price,photo:r.photo,category:r.category||"",createdAt:Number(r.created_at)};
 }
 
 async function saveDoll(){
@@ -597,13 +682,16 @@ async function saveDoll(){
   if(!name||!draftSize)return;
   let priceStr=$("#priceInput").value.replace(/[^0-9]/g,"");
   const price = priceStr===""?null:Number(priceStr);
+  // 카테고리: 직접 입력한 텍스트가 있으면 우선, 없으면 선택한 칩
+  const typed=$("#catInput").value.trim();
+  const category = (typed || draftCategory || "").trim();
   const btn=$("#btnSave");
   btn.disabled=true;btn.textContent="저장 중...";
 
   try{
     if(editingId){
       const{error}=await sb.from("dolls").update({
-        name,size:draftSize,price,photo:draftPhoto||null
+        name,size:draftSize,price,photo:draftPhoto||null,category:category||null
       }).eq("id",editingId);
       if(error)throw error;
     }else{
@@ -612,6 +700,7 @@ async function saveDoll(){
         user_id: session.user.id,
         name, size:draftSize, price,
         photo: draftPhoto||null,
+        category: category||null,
         created_at: Date.now()
       });
       if(error)throw error;
@@ -642,7 +731,48 @@ async function removeDoll(id){
 /* =========================================================
    RENDER
    ========================================================= */
+function allCategories(){
+  return [...new Set(dolls.map(d=>d.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ko"));
+}
+
+function renderCatTabs(){
+  const cats=allCategories();
+  const box=$("#catTabs");
+  if(!cats.length){box.innerHTML="";return;}
+  let html=`<button class="tab ${categoryFilter==="all"?"on":""}" data-cat="all">전체</button>`;
+  cats.forEach(c=>{
+    const cnt=dolls.filter(d=>d.category===c).length;
+    html+=`<button class="tab ${categoryFilter===c?"on":""}" data-cat="${escapeHtml(c)}">${escapeHtml(c)} <span class="cnt">${cnt}</span></button>`;
+  });
+  box.innerHTML=html;
+  box.querySelectorAll(".tab").forEach(t=>{
+    t.addEventListener("click",()=>{categoryFilter=t.dataset.cat;render();});
+  });
+}
+
+function inPriceRange(d){
+  if(priceFilter==="all")return true;
+  if(priceFilter==="none")return d.price==null||d.price==="";
+  if(d.price==null||d.price==="")return false;
+  const[min,max]=priceFilter.split("-").map(Number);
+  return d.price>=min && d.price<max;
+}
+
+function sortList(arr){
+  const a=arr.slice();
+  const val=d=>(d.price==null||d.price==="")?null:Number(d.price);
+  switch(sortMode){
+    case "old": a.sort((x,y)=>x.createdAt-y.createdAt); break;
+    case "price_high": a.sort((x,y)=>(val(y)??-1)-(val(x)??-1)); break;
+    case "price_low": a.sort((x,y)=>(val(x)??Infinity)-(val(y)??Infinity)); break;
+    case "name": a.sort((x,y)=>x.name.localeCompare(y.name,"ko")); break;
+    default: a.sort((x,y)=>y.createdAt-x.createdAt); // new
+  }
+  return a;
+}
+
 function render(){
+  // summary (전체 기준)
   const priced=dolls.filter(d=>d.price!=null&&d.price!=="");
   const total=priced.reduce((s,d)=>s+Number(d.price),0);
   const avg=priced.length?Math.round(total/priced.length):0;
@@ -651,16 +781,29 @@ function render(){
   $("#sumUnpriced").innerHTML=(dolls.length-priced.length)+'<small>마리</small>';
   $("#sumAvg").innerHTML=fmt(avg)+'<small>원</small>';
 
+  // size tab counts
   ["all","small","medium","large"].forEach(s=>{
     $("#c-"+s).textContent = s==="all"?dolls.length:dolls.filter(d=>d.size===s).length;
   });
 
-  const list=(filter==="all"?dolls:dolls.filter(d=>d.size===filter))
-    .slice().sort((a,b)=>b.createdAt-a.createdAt);
+  // category tabs
+  renderCatTabs();
+
+  // apply filters
+  const q=searchQuery.trim().toLowerCase();
+  let list=dolls.filter(d=>{
+    if(filter!=="all"&&d.size!==filter)return false;
+    if(categoryFilter!=="all"&&d.category!==categoryFilter)return false;
+    if(!inPriceRange(d))return false;
+    if(q&&!d.name.toLowerCase().includes(q))return false;
+    return true;
+  });
+  list=sortList(list);
+
   const grid=$("#grid");grid.innerHTML="";
   $("#empty").style.display=dolls.length?"none":"block";
   if(dolls.length&&!list.length){
-    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--text-mute);padding:40px 0;font-size:14px;font-weight:600;">이 크기의 인형이 아직 없어요</div>';
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--text-mute);padding:40px 0;font-size:14px;font-weight:600;">조건에 맞는 인형이 없어요</div>';
   }
   list.forEach(d=>{
     const el=document.createElement("button");
@@ -668,12 +811,14 @@ function render(){
     const priceHtml = (d.price!=null&&d.price!=="")
       ? `<div class="pr">${fmt(d.price)}원</div>`
       : `<div class="pr none">가격 미정</div>`;
+    const catHtml = d.category ? `<div class="dcat">${escapeHtml(d.category)}</div>` : "";
     el.innerHTML=`
       <div class="thumb">
         ${d.photo?`<img src="${d.photo}" alt="${escapeHtml(d.name)}" loading="lazy">`:`<div class="noimg">${emojiFor(d.size)}</div>`}
         <div class="badge ${d.size}">${sizeLabel[d.size]}</div>
       </div>
       <div class="body">
+        ${catHtml}
         <div class="nm">${escapeHtml(d.name)}</div>
         ${priceHtml}
       </div>`;
@@ -689,15 +834,35 @@ function openEdit(doll){
   editingId = doll?doll.id:null;
   draftPhoto = doll?doll.photo:null;
   draftSize = doll?doll.size:null;
+  draftCategory = doll?(doll.category||""):"";
   $("#editTitle").textContent = doll?"인형 수정":"인형 추가";
   $("#nameInput").value = doll?doll.name:"";
   $("#priceInput").value = (doll&&doll.price!=null&&doll.price!=="")?fmt(doll.price):"";
+  $("#catInput").value = "";
   $("#btnDelete").style.display = doll?"flex":"none";
   updatePhotoBox();
   updateSizeSel();
+  renderCatChips();
   updateMarketLinks();
   validate();
   showSheet("Edit");
+}
+function renderCatChips(){
+  const cats=allCategories();
+  const box=$("#catChips");
+  // 편집 중인 인형의 기존 카테고리가 목록에 없으면 포함
+  if(draftCategory && !cats.includes(draftCategory)) cats.unshift(draftCategory);
+  if(!cats.length){box.innerHTML="";return;}
+  box.innerHTML = cats.map(c=>
+    `<button type="button" class="cchip ${c===draftCategory?"on":""}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`
+  ).join("");
+  box.querySelectorAll(".cchip").forEach(chip=>{
+    chip.addEventListener("click",()=>{
+      if(draftCategory===chip.dataset.cat){draftCategory="";}   // 다시 누르면 해제
+      else{draftCategory=chip.dataset.cat; $("#catInput").value="";}
+      renderCatChips();
+    });
+  });
 }
 function updatePhotoBox(){
   const box=$("#photobox");
@@ -738,7 +903,8 @@ function openDetail(id){
   detailId=id;
   $("#detailImg").innerHTML = d.photo?`<img src="${d.photo}" alt="${escapeHtml(d.name)}">`:`<div class="noimg">${emojiFor(d.size)}</div>`;
   $("#detailName").textContent=d.name;
-  $("#detailMeta").innerHTML=`<span class="badge ${d.size}" style="position:static;">${sizeLabel[d.size]}</span>`;
+  const catBadge = d.category ? `<span class="badge medium" style="position:static;background:var(--blue-soft);color:var(--blue);">${escapeHtml(d.category)}</span>` : "";
+  $("#detailMeta").innerHTML=`<span class="badge ${d.size}" style="position:static;">${sizeLabel[d.size]}</span>${catBadge}`;
   if(d.price!=null&&d.price!==""){
     $("#detailPrice").className="detail-price";
     $("#detailPrice").textContent=fmt(d.price)+"원";
@@ -777,6 +943,10 @@ $("#fileInput").addEventListener("change",async e=>{
   e.target.value="";
 });
 $("#nameInput").addEventListener("input",()=>{updateMarketLinks();validate();});
+$("#catInput").addEventListener("input",()=>{
+  // 직접 입력하면 칩 선택 해제
+  if($("#catInput").value.trim()!==""){draftCategory="";renderCatChips();}
+});
 document.querySelectorAll("#sizeSel button").forEach(b=>{
   b.addEventListener("click",()=>{draftSize=b.dataset.size;updateSizeSel();validate();});
 });
@@ -800,6 +970,20 @@ document.querySelectorAll("#tabs .tab").forEach(t=>{
     t.classList.add("on");filter=t.dataset.size;render();
   });
 });
+
+/* search */
+$("#searchInput").addEventListener("input",e=>{
+  searchQuery=e.target.value;
+  $("#searchClear").hidden = searchQuery.trim()==="";
+  render();
+});
+$("#searchClear").addEventListener("click",()=>{
+  searchQuery="";$("#searchInput").value="";$("#searchClear").hidden=true;render();
+});
+
+/* sort & price filter */
+$("#sortSel").addEventListener("change",e=>{sortMode=e.target.value;render();});
+$("#priceSel").addEventListener("change",e=>{priceFilter=e.target.value;render();});
 
 $("#scrimEdit").addEventListener("click",()=>hideSheet("Edit"));
 $("#scrimDetail").addEventListener("click",()=>hideSheet("Detail"));
