@@ -277,8 +277,8 @@
     <div class="auth-err" id="authErr"></div>
     <div class="auth-msg" id="authMsg"></div>
     <div class="auth-field">
-      <label for="authEmail">이메일</label>
-      <input class="inp" id="authEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+      <label for="authId">아이디</label>
+      <input class="inp" id="authId" type="text" placeholder="원하는 아이디 (영문·숫자)" autocomplete="username" autocapitalize="off" spellcheck="false" />
     </div>
     <div class="auth-field">
       <label for="authPw">비밀번호</label>
@@ -409,8 +409,15 @@
 <div class="toast" id="toast"></div>
 
 <script>
+/* =========================================================
+   ⚠️ 여기에 본인 Supabase 프로젝트 값을 넣어주세요
+   ========================================================= */
 const SUPABASE_URL = "https://hsztautnbifyfdoglley.supabase.co";        // 예: https://abcdxyz.supabase.co
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzenRhdXRuYmlmeWZkb2dsbGV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4OTI3MTMsImV4cCI6MjA5ODQ2ODcxM30.kdxckH48H9qBUfXwCisFPy0-hpTO9cFDhubYnrZYHAk"; // 예: eyJhbGciOi...
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzenRhdXRuYmlmeWZkb2dsbGV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4OTI3MTMsImV4cCI6MjA5ODQ2ODcxM30.kdxckH48H9qBUfXwCisFPy0-hpTO9cFDhubYnrZYHAk"; //
+
+/* 아이디 뒤에 붙는 고정 도메인 (가짜 이메일 변환용) — 바꾸지 않아도 됩니다 */
+const USERNAME_DOMAIN = "ddobki.app";
+const emailFor = u => u.toLowerCase().trim() + "@" + USERNAME_DOMAIN;
 
 /* ---------- Init check ---------- */
 const CONFIGURED = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
@@ -481,7 +488,7 @@ function setAuthMode(mode){
     $("#authPw").setAttribute("autocomplete","current-password");
   }else{
     $("#authTitle").textContent="처음이시군요";
-    $("#authSub").textContent="이메일로 계정을 만들어보세요";
+    $("#authSub").textContent="원하는 아이디로 계정을 만들어보세요";
     $("#authSubmitText").textContent="회원가입";
     $("#authSwitchText").textContent="이미 계정이 있으신가요?";
     $("#authSwitchBtn").textContent="로그인";
@@ -490,24 +497,24 @@ function setAuthMode(mode){
 }
 $("#authSwitchBtn").addEventListener("click",()=>setAuthMode(authMode==="login"?"signup":"login"));
 
+function showAuthErr(t){$("#authErr").textContent=t;$("#authErr").classList.add("on");}
 async function handleAuthSubmit(){
-  const email=$("#authEmail").value.trim();
+  const username=$("#authId").value.trim();
   const pw=$("#authPw").value;
   $("#authErr").classList.remove("on");
   $("#authMsg").classList.remove("on");
-  if(!email||!pw){
-    $("#authErr").textContent="이메일과 비밀번호를 입력해주세요.";
-    $("#authErr").classList.add("on");
-    return;
+  if(!username||!pw){
+    showAuthErr("아이디와 비밀번호를 입력해주세요.");return;
+  }
+  if(!/^[a-zA-Z0-9._-]{3,}$/.test(username)){
+    showAuthErr("아이디는 영문·숫자 3자 이상으로 입력해주세요. (한글·공백 불가)");return;
   }
   if(pw.length<6){
-    $("#authErr").textContent="비밀번호는 6자 이상이어야 해요.";
-    $("#authErr").classList.add("on");
-    return;
+    showAuthErr("비밀번호는 6자 이상이어야 해요.");return;
   }
+  const email=emailFor(username);
   const btn=$("#authSubmit");
   btn.disabled=true;
-  const original=$("#authSubmitText").textContent;
   btn.innerHTML='<span class="spinner"></span>';
 
   try{
@@ -516,24 +523,27 @@ async function handleAuthSubmit(){
       if(error)throw error;
       // onAuthStateChange handles the rest
     }else{
-      const{error}=await sb.auth.signUp({email,password:pw});
+      const{data,error}=await sb.auth.signUp({email,password:pw});
       if(error)throw error;
-      $("#authMsg").textContent="가입 확인 이메일을 보냈어요. 메일함에서 링크를 눌러 인증해주세요.";
-      $("#authMsg").classList.add("on");
-      setAuthMode("login");
+      if(data.session){
+        // 이메일 인증 꺼져 있음 → 바로 로그인됨 (onAuthStateChange가 처리)
+      }else{
+        // 이메일 인증이 켜져 있는 경우: 가짜 이메일이라 인증 불가
+        showAuthErr("이메일 인증이 켜져 있어요. Supabase 설정에서 'Confirm email'을 꺼야 아이디 로그인이 작동해요.");
+      }
     }
   }catch(e){
-    $("#authErr").textContent = translateAuthError(e.message);
-    $("#authErr").classList.add("on");
+    showAuthErr(translateAuthError(e.message));
   }finally{
     btn.disabled=false;
     btn.innerHTML='<span id="authSubmitText">'+ (authMode==="login"?"로그인":"회원가입") +'</span>';
   }
 }
 function translateAuthError(msg){
-  if(/Invalid login credentials/i.test(msg))return "이메일 또는 비밀번호가 올바르지 않아요.";
-  if(/already registered/i.test(msg))return "이미 가입된 이메일이에요. 로그인해주세요.";
-  if(/Email not confirmed/i.test(msg))return "이메일 인증이 아직 완료되지 않았어요. 메일함을 확인해주세요.";
+  if(/Invalid login credentials/i.test(msg))return "아이디 또는 비밀번호가 올바르지 않아요.";
+  if(/already registered|already exists|User already/i.test(msg))return "이미 사용 중인 아이디예요. 로그인해주세요.";
+  if(/Email not confirmed/i.test(msg))return "이메일 인증이 켜져 있어요. Supabase 설정에서 'Confirm email'을 꺼주세요.";
+  if(/Password should be/i.test(msg))return "비밀번호는 6자 이상이어야 해요.";
   return "문제가 발생했어요: " + msg;
 }
 $("#authSubmit").addEventListener("click",handleAuthSubmit);
@@ -565,7 +575,8 @@ function showApp(){
   $("#authWrap").hidden=true;
   $("#appRoot").hidden=false;
   $("#fabWrap").hidden=false;
-  $("#acctEmail").textContent = session?.user?.email || "";
+  const em = session?.user?.email || "";
+  $("#acctEmail").textContent = em.includes("@"+USERNAME_DOMAIN) ? em.split("@")[0] + " 님" : em;
 }
 
 /* =========================================================
