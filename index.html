@@ -6,6 +6,7 @@
 <title>뽑기 장부</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root{
     --blue:#3182F6;
@@ -43,12 +44,47 @@
   input{font-family:inherit;letter-spacing:-.01em;}
   .app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:120px;}
 
+  /* ---------- Auth screen ---------- */
+  .auth-wrap{
+    min-height:100vh;max-width:480px;margin:0 auto;display:flex;flex-direction:column;
+    justify-content:center;padding:24px 28px;background:var(--bg);
+  }
+  .auth-logo{font-size:44px;text-align:center;margin-bottom:8px;}
+  .auth-title{font-size:24px;font-weight:800;text-align:center;letter-spacing:-.03em;}
+  .auth-sub{font-size:14px;color:var(--text-sub);text-align:center;margin-top:6px;margin-bottom:32px;}
+  .auth-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:26px 22px;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block;font-size:13px;font-weight:700;color:var(--text-sub);margin-bottom:7px;}
+  .auth-err{
+    background:#FFF0F0;color:var(--danger);font-size:13px;font-weight:600;border-radius:12px;
+    padding:11px 14px;margin-bottom:14px;display:none;line-height:1.5;
+  }
+  .auth-err.on{display:block;}
+  .auth-msg{
+    background:var(--green-soft);color:var(--green);font-size:13px;font-weight:600;border-radius:12px;
+    padding:11px 14px;margin-bottom:14px;display:none;line-height:1.5;
+  }
+  .auth-msg.on{display:block;}
+  .auth-submit{
+    width:100%;height:52px;border-radius:14px;background:var(--blue);color:#fff;font-size:16px;font-weight:800;
+    margin-top:6px;transition:transform .1s ease,background .15s ease;display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .auth-submit:active{transform:scale(.98);background:var(--blue-dark);}
+  .auth-submit:disabled{background:var(--line-strong);color:var(--text-mute);transform:none;}
+  .auth-switch{text-align:center;margin-top:20px;font-size:13px;color:var(--text-sub);}
+  .auth-switch button{color:var(--blue);font-weight:700;}
+  .spinner{
+    width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
   /* Header */
   .top{padding:20px 20px 4px;}
   .top .hi{font-size:14px;color:var(--text-sub);font-weight:600;}
   .top h1{font-size:24px;font-weight:800;margin:2px 0 0;letter-spacing:-.03em;}
 
-  /* Summary card (토스 자산 카드 느낌) */
+  /* Summary card */
   .summary{
     margin:16px 20px 0;background:var(--card);border-radius:var(--radius);
     box-shadow:var(--shadow);padding:22px 22px 18px;
@@ -96,7 +132,7 @@
   .doll .pr{font-size:16px;font-weight:800;margin-top:5px;letter-spacing:-.02em;}
   .doll .pr.none{color:var(--text-mute);font-weight:600;font-size:13px;}
 
-  /* Empty */
+  /* Empty / loading */
   .empty{padding:70px 30px;text-align:center;color:var(--text-mute);}
   .empty .ic{font-size:48px;margin-bottom:12px;}
   .empty .t{font-size:16px;font-weight:700;color:var(--text-sub);}
@@ -113,6 +149,7 @@
     box-shadow:0 6px 20px rgba(49,130,246,.35);transition:transform .1s ease,background .15s ease;
   }
   .fab button:active{transform:scale(.98);background:var(--blue-dark);}
+  .fab button:disabled{background:var(--text-mute);}
 
   /* Sheet (bottom modal) */
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:50;opacity:0;pointer-events:none;transition:opacity .25s ease;}
@@ -197,8 +234,9 @@
   .menu{position:absolute;top:22px;right:20px;display:flex;gap:8px;}
   .menu button{
     width:38px;height:38px;border-radius:12px;background:var(--card);box-shadow:var(--shadow);
-    display:flex;align-items:center;justify-content:center;font-size:17px;
+    display:flex;align-items:center;justify-content:center;font-size:15px;
   }
+  .acct{font-size:12px;color:var(--text-mute);margin-top:2px;font-weight:600;}
 
   /* Toast */
   .toast{
@@ -208,19 +246,60 @@
   }
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
 
+  /* Config warning screen */
+  .cfg-warn{max-width:480px;margin:60px auto;padding:0 24px;text-align:center;}
+  .cfg-warn .ic{font-size:44px;}
+  .cfg-warn h2{font-size:19px;font-weight:800;margin-top:14px;}
+  .cfg-warn p{font-size:14px;color:var(--text-sub);margin-top:10px;line-height:1.6;}
+  .cfg-warn code{background:var(--card);padding:2px 6px;border-radius:6px;font-size:13px;}
+
   @media (prefers-reduced-motion:reduce){
     *{transition:none!important;animation:none!important;}
   }
+  [hidden]{display:none!important;}
 </style>
 </head>
 <body>
-<div class="app">
+
+<!-- ====== CONFIG MISSING WARNING (shown if keys not filled) ====== -->
+<div class="cfg-warn" id="cfgWarn" hidden>
+  <div class="ic">⚙️</div>
+  <h2>Supabase 연결이 필요해요</h2>
+  <p>코드 상단의 <code>SUPABASE_URL</code>과 <code>SUPABASE_ANON_KEY</code>를<br>본인의 Supabase 프로젝트 값으로 채워주세요.</p>
+</div>
+
+<!-- ====== AUTH SCREEN ====== -->
+<div class="auth-wrap" id="authWrap" hidden>
+  <div class="auth-logo">🧸</div>
+  <div class="auth-title" id="authTitle">뽑기 장부</div>
+  <div class="auth-sub" id="authSub">로그인하고 내 인형들을 모아보세요</div>
+  <div class="auth-card">
+    <div class="auth-err" id="authErr"></div>
+    <div class="auth-msg" id="authMsg"></div>
+    <div class="auth-field">
+      <label for="authEmail">이메일</label>
+      <input class="inp" id="authEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+    </div>
+    <div class="auth-field">
+      <label for="authPw">비밀번호</label>
+      <input class="inp" id="authPw" type="password" placeholder="6자 이상" autocomplete="current-password" />
+    </div>
+    <button class="auth-submit" id="authSubmit"><span id="authSubmitText">로그인</span></button>
+    <div class="auth-switch">
+      <span id="authSwitchText">아직 계정이 없으신가요?</span>
+      <button id="authSwitchBtn">회원가입</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== MAIN APP ====== -->
+<div class="app" id="appRoot" hidden>
   <div class="top">
     <div class="hi">오늘도 하나 뽑으셨나요?</div>
     <h1>뽑기 장부</h1>
+    <div class="acct" id="acctEmail"></div>
     <div class="menu">
-      <button id="btnExport" title="백업 내보내기" aria-label="백업 내보내기">↓</button>
-      <button id="btnImport" title="백업 가져오기" aria-label="백업 가져오기">↑</button>
+      <button id="btnLogout" title="로그아웃" aria-label="로그아웃">⏻</button>
     </div>
   </div>
 
@@ -249,7 +328,7 @@
   </div>
 </div>
 
-<div class="fab">
+<div class="fab" id="fabWrap" hidden>
   <button id="btnAdd">＋ 인형 추가하기</button>
 </div>
 
@@ -327,51 +406,47 @@
   </div>
 </div>
 
-<input type="file" id="importInput" accept="application/json,.json" style="display:none" />
 <div class="toast" id="toast"></div>
 
 <script>
-/* ---------- IndexedDB ---------- */
-const DB_NAME="ddobki-db", STORE="dolls";
-let db=null;
-function openDB(){
-  return new Promise((res,rej)=>{
-    const r=indexedDB.open(DB_NAME,1);
-    r.onupgradeneeded=e=>{
-      const d=e.target.result;
-      if(!d.objectStoreNames.contains(STORE)){
-        d.createObjectStore(STORE,{keyPath:"id"});
-      }
-    };
-    r.onsuccess=e=>{db=e.target.result;res(db);};
-    r.onerror=e=>rej(e.target.error);
-  });
-}
-function tx(mode){return db.transaction(STORE,mode).objectStore(STORE);}
-function getAll(){return new Promise((res,rej)=>{const r=tx("readonly").getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error);});}
-function put(doll){return new Promise((res,rej)=>{const r=tx("readwrite").put(doll);r.onsuccess=()=>res();r.onerror=()=>rej(r.error);});}
-function del(id){return new Promise((res,rej)=>{const r=tx("readwrite").delete(id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error);});}
+const SUPABASE_URL = "https://hsztautnbifyfdoglley.supabase.co";        // 예: https://abcdxyz.supabase.co
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzenRhdXRuYmlmeWZkb2dsbGV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4OTI3MTMsImV4cCI6MjA5ODQ2ODcxM30.kdxckH48H9qBUfXwCisFPy0-hpTO9cFDhubYnrZYHAk"; // 예: eyJhbGciOi...
 
-/* ---------- State ---------- */
-let dolls=[];
-let filter="all";
-let editingId=null;      // null = new
-let draftPhoto=null;     // base64 or null
-let draftSize=null;
+/* ---------- Init check ---------- */
+const CONFIGURED = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
+if(!CONFIGURED){
+  document.getElementById("cfgWarn").hidden = false;
+}
+
+const sb = CONFIGURED ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 /* ---------- Helpers ---------- */
 const $=s=>document.querySelector(s);
 const fmt=n=>Number(n).toLocaleString("ko-KR");
 const sizeLabel={small:"소형",medium:"중형",large:"대형"};
 const emojiFor=s=>({small:"🧸",medium:"🐻",large:"🐰"}[s]||"🧸");
-
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
 function toast(msg){
   const t=$("#toast");t.textContent=msg;t.classList.add("on");
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("on"),1800);
 }
 
-/* Resize image before storing to keep DB small */
-function resizeImage(file,maxSide=1100,quality=.85){
+/* ---------- State ---------- */
+let dolls=[];
+let filter="all";
+let editingId=null;
+let draftPhoto=null;
+let draftSize=null;
+let detailId=null;
+let session=null;
+let authMode="login"; // or "signup"
+
+/* ---------- Market links ---------- */
+function bunjangUrl(name){return "https://m.bunjang.co.kr/search/products?q="+encodeURIComponent(name.trim());}
+function daangnUrl(name){return "https://www.daangn.com/search/"+encodeURIComponent(name.trim());}
+
+/* ---------- Image resize ---------- */
+function resizeImage(file,maxSide=900,quality=.8){
   return new Promise((res,rej)=>{
     const reader=new FileReader();
     reader.onload=()=>{
@@ -390,13 +465,173 @@ function resizeImage(file,maxSide=1100,quality=.85){
   });
 }
 
-/* Market search links */
-function bunjangUrl(name){return "https://m.bunjang.co.kr/search/products?q="+encodeURIComponent(name.trim());}
-function daangnUrl(name){return "https://www.daangn.com/search/"+encodeURIComponent(name.trim());}
+/* =========================================================
+   AUTH
+   ========================================================= */
+function setAuthMode(mode){
+  authMode=mode;
+  $("#authErr").classList.remove("on");
+  $("#authMsg").classList.remove("on");
+  if(mode==="login"){
+    $("#authTitle").textContent="다시 오셨네요";
+    $("#authSub").textContent="로그인하고 내 인형들을 모아보세요";
+    $("#authSubmitText").textContent="로그인";
+    $("#authSwitchText").textContent="아직 계정이 없으신가요?";
+    $("#authSwitchBtn").textContent="회원가입";
+    $("#authPw").setAttribute("autocomplete","current-password");
+  }else{
+    $("#authTitle").textContent="처음이시군요";
+    $("#authSub").textContent="이메일로 계정을 만들어보세요";
+    $("#authSubmitText").textContent="회원가입";
+    $("#authSwitchText").textContent="이미 계정이 있으신가요?";
+    $("#authSwitchBtn").textContent="로그인";
+    $("#authPw").setAttribute("autocomplete","new-password");
+  }
+}
+$("#authSwitchBtn").addEventListener("click",()=>setAuthMode(authMode==="login"?"signup":"login"));
 
-/* ---------- Render ---------- */
+async function handleAuthSubmit(){
+  const email=$("#authEmail").value.trim();
+  const pw=$("#authPw").value;
+  $("#authErr").classList.remove("on");
+  $("#authMsg").classList.remove("on");
+  if(!email||!pw){
+    $("#authErr").textContent="이메일과 비밀번호를 입력해주세요.";
+    $("#authErr").classList.add("on");
+    return;
+  }
+  if(pw.length<6){
+    $("#authErr").textContent="비밀번호는 6자 이상이어야 해요.";
+    $("#authErr").classList.add("on");
+    return;
+  }
+  const btn=$("#authSubmit");
+  btn.disabled=true;
+  const original=$("#authSubmitText").textContent;
+  btn.innerHTML='<span class="spinner"></span>';
+
+  try{
+    if(authMode==="login"){
+      const{error}=await sb.auth.signInWithPassword({email,password:pw});
+      if(error)throw error;
+      // onAuthStateChange handles the rest
+    }else{
+      const{error}=await sb.auth.signUp({email,password:pw});
+      if(error)throw error;
+      $("#authMsg").textContent="가입 확인 이메일을 보냈어요. 메일함에서 링크를 눌러 인증해주세요.";
+      $("#authMsg").classList.add("on");
+      setAuthMode("login");
+    }
+  }catch(e){
+    $("#authErr").textContent = translateAuthError(e.message);
+    $("#authErr").classList.add("on");
+  }finally{
+    btn.disabled=false;
+    btn.innerHTML='<span id="authSubmitText">'+ (authMode==="login"?"로그인":"회원가입") +'</span>';
+  }
+}
+function translateAuthError(msg){
+  if(/Invalid login credentials/i.test(msg))return "이메일 또는 비밀번호가 올바르지 않아요.";
+  if(/already registered/i.test(msg))return "이미 가입된 이메일이에요. 로그인해주세요.";
+  if(/Email not confirmed/i.test(msg))return "이메일 인증이 아직 완료되지 않았어요. 메일함을 확인해주세요.";
+  return "문제가 발생했어요: " + msg;
+}
+$("#authSubmit").addEventListener("click",handleAuthSubmit);
+$("#authPw").addEventListener("keydown",e=>{if(e.key==="Enter")handleAuthSubmit();});
+
+$("#btnLogout").addEventListener("click",async()=>{
+  await sb.auth.signOut();
+});
+
+/* ---------- Auth state -> screen switching ---------- */
+if(CONFIGURED){
+  sb.auth.onAuthStateChange((event,sess)=>{
+    session=sess;
+    if(sess){
+      showApp();
+      loadDolls();
+    }else{
+      showAuth();
+    }
+  });
+}
+
+function showAuth(){
+  $("#authWrap").hidden=false;
+  $("#appRoot").hidden=true;
+  $("#fabWrap").hidden=true;
+}
+function showApp(){
+  $("#authWrap").hidden=true;
+  $("#appRoot").hidden=false;
+  $("#fabWrap").hidden=false;
+  $("#acctEmail").textContent = session?.user?.email || "";
+}
+
+/* =========================================================
+   DATA (Supabase)
+   ========================================================= */
+async function loadDolls(){
+  const{data,error}=await sb.from("dolls").select("*").order("created_at",{ascending:false});
+  if(error){toast("불러오기 실패: "+error.message);return;}
+  dolls = (data||[]).map(rowToDoll);
+  render();
+}
+function rowToDoll(r){
+  return {id:r.id,name:r.name,size:r.size,price:r.price,photo:r.photo,createdAt:Number(r.created_at)};
+}
+
+async function saveDoll(){
+  const name=$("#nameInput").value.trim();
+  if(!name||!draftSize)return;
+  let priceStr=$("#priceInput").value.replace(/[^0-9]/g,"");
+  const price = priceStr===""?null:Number(priceStr);
+  const btn=$("#btnSave");
+  btn.disabled=true;btn.textContent="저장 중...";
+
+  try{
+    if(editingId){
+      const{error}=await sb.from("dolls").update({
+        name,size:draftSize,price,photo:draftPhoto||null
+      }).eq("id",editingId);
+      if(error)throw error;
+    }else{
+      const{error}=await sb.from("dolls").insert({
+        id: crypto.randomUUID(),
+        user_id: session.user.id,
+        name, size:draftSize, price,
+        photo: draftPhoto||null,
+        created_at: Date.now()
+      });
+      if(error)throw error;
+    }
+    await loadDolls();
+    hideSheet("Edit");
+    toast(editingId?"수정했어요":"추가했어요");
+  }catch(e){
+    toast("저장 실패: "+e.message);
+  }finally{
+    btn.disabled=false;btn.textContent="저장하기";
+    validate();
+  }
+}
+
+async function removeDoll(id){
+  try{
+    const{error}=await sb.from("dolls").delete().eq("id",id);
+    if(error)throw error;
+    await loadDolls();
+    hideSheet("Edit");hideSheet("Detail");
+    toast("삭제했어요");
+  }catch(e){
+    toast("삭제 실패: "+e.message);
+  }
+}
+
+/* =========================================================
+   RENDER
+   ========================================================= */
 function render(){
-  // summary
   const priced=dolls.filter(d=>d.price!=null&&d.price!=="");
   const total=priced.reduce((s,d)=>s+Number(d.price),0);
   const avg=priced.length?Math.round(total/priced.length):0;
@@ -405,12 +640,10 @@ function render(){
   $("#sumUnpriced").innerHTML=(dolls.length-priced.length)+'<small>마리</small>';
   $("#sumAvg").innerHTML=fmt(avg)+'<small>원</small>';
 
-  // tab counts
   ["all","small","medium","large"].forEach(s=>{
     $("#c-"+s).textContent = s==="all"?dolls.length:dolls.filter(d=>d.size===s).length;
   });
 
-  // grid
   const list=(filter==="all"?dolls:dolls.filter(d=>d.size===filter))
     .slice().sort((a,b)=>b.createdAt-a.createdAt);
   const grid=$("#grid");grid.innerHTML="";
@@ -437,9 +670,10 @@ function render(){
     grid.appendChild(el);
   });
 }
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
 
-/* ---------- Edit sheet ---------- */
+/* =========================================================
+   EDIT SHEET
+   ========================================================= */
 function openEdit(doll){
   editingId = doll?doll.id:null;
   draftPhoto = doll?doll.photo:null;
@@ -485,8 +719,9 @@ function validate(){
   $("#btnSave").disabled=!ok;
 }
 
-/* ---------- Detail sheet ---------- */
-let detailId=null;
+/* =========================================================
+   DETAIL SHEET
+   ========================================================= */
 function openDetail(id){
   const d=dolls.find(x=>x.id===id);if(!d)return;
   detailId=id;
@@ -519,73 +754,9 @@ function hideSheet(which){
   document.body.style.overflow="";
 }
 
-/* ---------- Save / delete ---------- */
-async function save(){
-  const name=$("#nameInput").value.trim();
-  if(!name||!draftSize)return;
-  let price=$("#priceInput").value.replace(/[^0-9]/g,"");
-  price = price===""?null:Number(price);
-  const doll={
-    id: editingId || (Date.now()+"-"+Math.random().toString(36).slice(2,7)),
-    name, size:draftSize, price,
-    photo:draftPhoto||null,
-    createdAt: editingId ? (dolls.find(d=>d.id===editingId)?.createdAt||Date.now()) : Date.now()
-  };
-  await put(doll);
-  dolls=await getAll();
-  render();
-  hideSheet("Edit");
-  toast(editingId?"수정했어요":"추가했어요");
-}
-async function removeDoll(id){
-  await del(id);
-  dolls=await getAll();
-  render();
-  hideSheet("Edit");hideSheet("Detail");
-  toast("삭제했어요");
-}
-
-/* ---------- Export / Import ---------- */
-function exportData(){
-  if(!dolls.length){toast("내보낼 데이터가 없어요");return;}
-  const blob=new Blob([JSON.stringify({app:"뽑기장부",version:1,exportedAt:Date.now(),dolls},null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;
-  a.download=`뽑기장부_백업_${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast("백업 파일을 저장했어요");
-}
-async function importData(file){
-  try{
-    const text=await file.text();
-    const data=JSON.parse(text);
-    const incoming=Array.isArray(data)?data:data.dolls;
-    if(!Array.isArray(incoming))throw new Error("형식 오류");
-    let added=0;
-    const existing=new Set(dolls.map(d=>d.id));
-    for(const d of incoming){
-      if(!d||!d.name)continue;
-      const doll={
-        id:d.id||(Date.now()+"-"+Math.random().toString(36).slice(2,7)),
-        name:d.name,
-        size:["small","medium","large"].includes(d.size)?d.size:"medium",
-        price:(d.price===null||d.price===undefined||d.price==="")?null:Number(d.price),
-        photo:d.photo||null,
-        createdAt:d.createdAt||Date.now()
-      };
-      if(existing.has(doll.id))doll.id=Date.now()+"-"+Math.random().toString(36).slice(2,7);
-      await put(doll);added++;
-    }
-    dolls=await getAll();render();
-    toast(`${added}마리를 불러왔어요`);
-  }catch(e){
-    toast("파일을 읽지 못했어요");
-  }
-}
-
-/* ---------- Events ---------- */
+/* =========================================================
+   EVENTS
+   ========================================================= */
 $("#btnAdd").addEventListener("click",()=>openEdit(null));
 $("#photobox").addEventListener("click",()=>$("#fileInput").click());
 $("#fileInput").addEventListener("change",async e=>{
@@ -602,7 +773,7 @@ $("#priceInput").addEventListener("input",e=>{
   let v=e.target.value.replace(/[^0-9]/g,"");
   e.target.value = v===""?"":fmt(Number(v));
 });
-$("#btnSave").addEventListener("click",save);
+$("#btnSave").addEventListener("click",saveDoll);
 $("#btnDelete").addEventListener("click",()=>{
   if(editingId&&confirm("이 인형을 삭제할까요?"))removeDoll(editingId);
 });
@@ -612,7 +783,6 @@ $("#btnEditFromDetail").addEventListener("click",()=>{
   setTimeout(()=>openEdit(d),150);
 });
 
-// tabs
 document.querySelectorAll("#tabs .tab").forEach(t=>{
   t.addEventListener("click",()=>{
     document.querySelectorAll("#tabs .tab").forEach(x=>x.classList.remove("on"));
@@ -620,27 +790,13 @@ document.querySelectorAll("#tabs .tab").forEach(t=>{
   });
 });
 
-// scrims
 $("#scrimEdit").addEventListener("click",()=>hideSheet("Edit"));
 $("#scrimDetail").addEventListener("click",()=>hideSheet("Detail"));
 
-// export / import
-$("#btnExport").addEventListener("click",exportData);
-$("#btnImport").addEventListener("click",()=>$("#importInput").click());
-$("#importInput").addEventListener("change",e=>{
-  const f=e.target.files[0];if(f)importData(f);e.target.value="";
-});
-
 /* ---------- Init ---------- */
-(async function(){
-  try{
-    await openDB();
-    dolls=await getAll();
-  }catch(e){
-    toast("저장소를 열지 못했어요");
-  }
-  render();
-})();
+if(CONFIGURED){
+  setAuthMode("login");
+}
 </script>
 </body>
 </html>
