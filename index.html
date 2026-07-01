@@ -171,7 +171,7 @@
   .badge.small{background:var(--green-soft);color:var(--green);}
   .badge.medium{background:var(--blue-soft);color:var(--blue);}
   .badge.large{background:var(--purple-soft);color:var(--purple);}
-  .doll .body{padding:12px 13px 14px;}
+  .doll .body{padding:12px 3px 14px;}
   .doll .dcat{font-size:11px;font-weight:700;color:var(--blue);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .doll .nm{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .doll .pr{font-size:16px;font-weight:800;margin-top:5px;letter-spacing:-.02em;}
@@ -255,6 +255,23 @@
   .market .btns a.disabled{opacity:.4;pointer-events:none;}
   .m-bunjang{background:#FF5D40;color:#fff;}
   .m-daangn{background:#FF7E36;color:#fff;}
+
+  /* Sell link (detail sheet) */
+  .sell-link{margin-top:18px;}
+  .sell-link a{
+    display:flex;align-items:center;gap:10px;background:var(--blue-soft);color:var(--blue);
+    border-radius:14px;padding:15px 16px;text-decoration:none;font-size:14px;font-weight:700;
+    transition:transform .1s ease;
+  }
+  .sell-link a:active{transform:scale(.98);}
+  .sell-link .sl-ic{font-size:16px;}
+  .sell-link .sl-txt{flex:1;}
+  .sell-link .sl-arrow{font-size:18px;opacity:.6;}
+
+  /* Selling badge on card */
+  .badge.selling{
+    position:absolute;top:10px;right:10px;left:auto;background:var(--blue);color:#fff;
+  }
 
   /* Save / actions */
   .actions{display:flex;gap:10px;margin-top:26px;}
@@ -457,6 +474,11 @@
       </div>
     </div>
 
+    <div class="field">
+      <label for="linkInput">판매 링크 <span style="color:var(--text-mute);font-weight:600;">(선택)</span></label>
+      <input class="inp" id="linkInput" type="url" placeholder="지금 판매 중이라면 그 글 링크를 붙여넣으세요" autocomplete="off" inputmode="url" />
+    </div>
+
     <div class="actions">
       <button class="btn ghost" id="btnDelete" style="display:none;" title="삭제" aria-label="삭제">🗑</button>
       <button class="btn primary" id="btnSave" disabled>저장하기</button>
@@ -474,6 +496,15 @@
     <div class="detail-meta" id="detailMeta"></div>
     <div class="detail-price" id="detailPrice"></div>
     <div class="detail-date" id="detailDate"></div>
+
+    <div id="sellLinkBox" class="sell-link" hidden>
+      <a id="sellLinkA" target="_blank" rel="noopener">
+        <span class="sl-ic">🔗</span>
+        <span class="sl-txt">내가 올린 판매글 보러가기</span>
+        <span class="sl-arrow">›</span>
+      </a>
+    </div>
+
     <div class="market" style="margin-top:22px;">
       <div class="mt">🔍 다시 시세 확인</div>
       <div class="btns">
@@ -675,7 +706,7 @@ async function loadDolls(){
   render();
 }
 function rowToDoll(r){
-  return {id:r.id,name:r.name,size:r.size,price:r.price,photo:r.photo,category:r.category||"",createdAt:Number(r.created_at)};
+  return {id:r.id,name:r.name,size:r.size,price:r.price,photo:r.photo,category:r.category||"",sellLink:r.sell_link||"",createdAt:Number(r.created_at)};
 }
 
 async function saveDoll(){
@@ -686,13 +717,16 @@ async function saveDoll(){
   // 카테고리: 직접 입력한 텍스트가 있으면 우선, 없으면 선택한 칩
   const typed=$("#catInput").value.trim();
   const category = (typed || draftCategory || "").trim();
+  // 판매 링크: 프로토콜 없이 입력해도 자동으로 https:// 붙여줌
+  let sellLink=$("#linkInput").value.trim();
+  if(sellLink && !/^https?:\/\//i.test(sellLink)) sellLink="https://"+sellLink;
   const btn=$("#btnSave");
   btn.disabled=true;btn.textContent="저장 중...";
 
   try{
     if(editingId){
       const{error}=await sb.from("dolls").update({
-        name,size:draftSize,price,photo:draftPhoto||null,category:category||null
+        name,size:draftSize,price,photo:draftPhoto||null,category:category||null,sell_link:sellLink||null
       }).eq("id",editingId);
       if(error)throw error;
     }else{
@@ -702,6 +736,7 @@ async function saveDoll(){
         name, size:draftSize, price,
         photo: draftPhoto||null,
         category: category||null,
+        sell_link: sellLink||null,
         created_at: Date.now()
       });
       if(error)throw error;
@@ -813,10 +848,12 @@ function render(){
       ? `<div class="pr">${fmt(d.price)}원</div>`
       : `<div class="pr none">가격 미정</div>`;
     const catHtml = d.category ? `<div class="dcat">${escapeHtml(d.category)}</div>` : "";
+    const sellBadge = d.sellLink ? `<div class="badge selling">판매중</div>` : "";
     el.innerHTML=`
       <div class="thumb">
         ${d.photo?`<img src="${d.photo}" alt="${escapeHtml(d.name)}" loading="lazy">`:`<div class="noimg">${emojiFor(d.size)}</div>`}
         <div class="badge ${d.size}">${sizeLabel[d.size]}</div>
+        ${sellBadge}
       </div>
       <div class="body">
         ${catHtml}
@@ -839,6 +876,7 @@ function openEdit(doll){
   $("#editTitle").textContent = doll?"인형 수정":"인형 추가";
   $("#nameInput").value = doll?doll.name:"";
   $("#priceInput").value = (doll&&doll.price!=null&&doll.price!=="")?fmt(doll.price):"";
+  $("#linkInput").value = doll?(doll.sellLink||""):"";
   $("#catInput").value = "";
   $("#btnDelete").style.display = doll?"flex":"none";
   updatePhotoBox();
@@ -917,6 +955,12 @@ function openDetail(id){
   $("#detailDate").textContent=`${dt.getFullYear()}. ${dt.getMonth()+1}. ${dt.getDate()} 등록`;
   $("#dLnkBunjang").href=bunjangUrl(d.name);
   $("#dLnkDaangn").href=daangnUrl(d.name);
+  if(d.sellLink){
+    $("#sellLinkBox").hidden=false;
+    $("#sellLinkA").href=d.sellLink;
+  }else{
+    $("#sellLinkBox").hidden=true;
+  }
   showSheet("Detail");
 }
 
