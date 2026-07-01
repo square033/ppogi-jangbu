@@ -315,6 +315,49 @@
   .cfg-warn p{font-size:14px;color:var(--text-sub);margin-top:10px;line-height:1.6;}
   .cfg-warn code{background:var(--card);padding:2px 6px;border-radius:6px;font-size:13px;}
 
+  /* Owner-view (guest) button on auth screen */
+  .auth-guest{
+    margin-top:16px;width:100%;height:52px;border-radius:14px;background:var(--card);
+    box-shadow:var(--shadow);color:var(--text);font-size:15px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .1s ease;
+  }
+  .auth-guest:active{transform:scale(.98);}
+
+  /* Read-only banner (guest mode) */
+  .ro-banner{
+    margin:14px 20px 0;background:var(--blue-soft);color:var(--blue);border-radius:14px;
+    padding:12px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;
+  }
+
+  /* ---------- Photo cropper ---------- */
+  .crop-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:90;display:none;flex-direction:column;}
+  .crop-modal.on{display:flex;}
+  .crop-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;color:#fff;}
+  .crop-head button{color:#fff;font-size:15px;font-weight:800;padding:6px 4px;}
+  .crop-head .ct{font-size:16px;font-weight:800;}
+  .crop-head .apply{color:#4dabf7;}
+  .crop-stage{flex:1;display:flex;align-items:center;justify-content:center;padding:0 16px;}
+  .crop-canvas-wrap{
+    position:relative;width:min(86vw,360px);height:min(86vw,360px);
+    border-radius:16px;overflow:hidden;touch-action:none;background:#000;
+  }
+  #cropCanvas{width:100%;height:100%;display:block;cursor:grab;touch-action:none;}
+  .crop-grid{
+    position:absolute;inset:0;pointer-events:none;
+    background-image:linear-gradient(rgba(255,255,255,.32) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.32) 1px,transparent 1px);
+    background-size:33.33% 33.33%;
+  }
+  .crop-ctrl{padding:18px 22px calc(24px + var(--safe-b));display:flex;flex-direction:column;gap:14px;}
+  .crop-rotate{
+    width:100%;height:50px;border-radius:14px;background:rgba(255,255,255,.14);color:#fff;
+    font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .crop-rotate:active{background:rgba(255,255,255,.24);}
+  .crop-zoom{display:flex;align-items:center;gap:12px;color:#fff;}
+  .crop-zoom input[type=range]{flex:1;accent-color:var(--blue);height:4px;}
+  .crop-zoom .zic{font-size:16px;opacity:.85;font-weight:700;width:16px;text-align:center;}
+
   @media (prefers-reduced-motion:reduce){
     *{transition:none!important;animation:none!important;}
   }
@@ -352,6 +395,7 @@
       <button id="authSwitchBtn">회원가입</button>
     </div>
   </div>
+  <button class="auth-guest" id="guestViewBtn">🧸 주인장 인형 구경하기</button>
 </div>
 
 <!-- ====== MAIN APP ====== -->
@@ -364,6 +408,8 @@
       <button id="btnLogout" title="로그아웃" aria-label="로그아웃">⏻</button>
     </div>
   </div>
+
+  <div class="ro-banner" id="roBanner" hidden>👀 구경 모드예요 · 수정·추가는 할 수 없어요</div>
 
   <div class="summary">
     <div class="label">전체 책정 가치</div>
@@ -518,6 +564,29 @@
   </div>
 </div>
 
+<!-- Photo cropper -->
+<div class="crop-modal" id="cropModal">
+  <div class="crop-head">
+    <button id="cropCancel">취소</button>
+    <div class="ct">사진 편집</div>
+    <button id="cropApply" class="apply">적용</button>
+  </div>
+  <div class="crop-stage">
+    <div class="crop-canvas-wrap">
+      <canvas id="cropCanvas"></canvas>
+      <div class="crop-grid"></div>
+    </div>
+  </div>
+  <div class="crop-ctrl">
+    <button class="crop-rotate" id="cropRotate">↻ 90° 회전</button>
+    <div class="crop-zoom">
+      <span class="zic">－</span>
+      <input type="range" id="cropZoom" min="100" max="400" value="100" />
+      <span class="zic">＋</span>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -530,6 +599,9 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 /* 아이디 뒤에 붙는 고정 도메인 (가짜 이메일 변환용) — 바꾸지 않아도 됩니다 */
 const USERNAME_DOMAIN = "ddobki.app";
 const emailFor = u => u.toLowerCase().trim() + "@" + USERNAME_DOMAIN;
+
+/* 주인장(jiji03) user UUID — "구경하기"로 이 계정 인형만 읽기 전용 조회 */
+const OWNER_ID = "027cae63-a9c5-44aa-8e7a-30ed5721a72d";
 
 /* ---------- Init check ---------- */
 const CONFIGURED = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
@@ -564,6 +636,7 @@ let draftCategory="";
 let detailId=null;
 let session=null;
 let authMode="login"; // or "signup"
+let readOnly=false;    // 구경 모드 여부
 
 /* ---------- Market links ---------- */
 function bunjangUrl(name){return "https://m.bunjang.co.kr/search/products?q="+encodeURIComponent(name.trim());}
@@ -667,6 +740,7 @@ $("#authSubmit").addEventListener("click",handleAuthSubmit);
 $("#authPw").addEventListener("keydown",e=>{if(e.key==="Enter")handleAuthSubmit();});
 
 $("#btnLogout").addEventListener("click",async()=>{
+  if(readOnly){exitGuestView();return;}
   await sb.auth.signOut();
 });
 
@@ -675,6 +749,10 @@ if(CONFIGURED){
   sb.auth.onAuthStateChange((event,sess)=>{
     session=sess;
     if(sess){
+      readOnly=false;
+      $("#roBanner").hidden=true;
+      $("#btnLogout").textContent="⏻";$("#btnLogout").title="로그아웃";
+      $(".top .hi").textContent="오늘도 하나 뽑으셨나요?";
       showApp();
       loadDolls();
     }else{
@@ -961,6 +1039,7 @@ function openDetail(id){
   }else{
     $("#sellLinkBox").hidden=true;
   }
+  $("#btnEditFromDetail").style.display = readOnly ? "none" : "flex";
   showSheet("Detail");
 }
 
@@ -981,10 +1060,9 @@ function hideSheet(which){
    ========================================================= */
 $("#btnAdd").addEventListener("click",()=>openEdit(null));
 $("#photobox").addEventListener("click",()=>$("#fileInput").click());
-$("#fileInput").addEventListener("change",async e=>{
+$("#fileInput").addEventListener("change",e=>{
   const f=e.target.files[0];if(!f)return;
-  try{draftPhoto=await resizeImage(f);updatePhotoBox();}
-  catch(_){toast("이미지를 불러오지 못했어요");}
+  openCropper(f);
   e.target.value="";
 });
 $("#nameInput").addEventListener("input",()=>{updateMarketLinks();validate();});
@@ -1032,6 +1110,134 @@ $("#priceSel").addEventListener("change",e=>{priceFilter=e.target.value;render()
 
 $("#scrimEdit").addEventListener("click",()=>hideSheet("Edit"));
 $("#scrimDetail").addEventListener("click",()=>hideSheet("Detail"));
+
+/* =========================================================
+   PHOTO CROPPER  (1:1 · 드래그 이동 + 줌 + 90° 회전)
+   ========================================================= */
+const cropCanvas=$("#cropCanvas");
+const cctx=cropCanvas.getContext("2d");
+const CROP_DISP=Math.round(Math.min(window.innerWidth*0.86,360)); // 표시 픽셀
+const CROP_OUT=900;                                               // 저장 픽셀
+let cImg=null,cRot=0,cBase=1,cScale=1,cPanX=0,cPanY=0;
+let cDrag=false,cLastX=0,cLastY=0;
+
+function openCropper(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      cImg=img;cRot=0;cScale=1;cPanX=0;cPanY=0;
+      cropCanvas.width=CROP_DISP;cropCanvas.height=CROP_DISP;
+      cBase=Math.max(CROP_DISP/img.width,CROP_DISP/img.height);
+      $("#cropZoom").value=100;
+      drawCrop();
+      $("#cropModal").classList.add("on");
+      document.body.style.overflow="hidden";
+    };
+    img.onerror=()=>toast("이미지를 불러오지 못했어요");
+    img.src=reader.result;
+  };
+  reader.onerror=()=>toast("이미지를 불러오지 못했어요");
+  reader.readAsDataURL(file);
+}
+function clampPan(){
+  const s=cBase*cScale, rotated=(cRot%180!==0);
+  const halfW=(rotated?cImg.height:cImg.width)*s/2;
+  const halfH=(rotated?cImg.width:cImg.height)*s/2;
+  const limX=Math.max(0,halfW-CROP_DISP/2), limY=Math.max(0,halfH-CROP_DISP/2);
+  cPanX=Math.max(-limX,Math.min(limX,cPanX));
+  cPanY=Math.max(-limY,Math.min(limY,cPanY));
+}
+function drawCrop(){
+  if(!cImg)return;
+  clampPan();
+  cctx.clearRect(0,0,CROP_DISP,CROP_DISP);
+  cctx.save();
+  cctx.translate(CROP_DISP/2+cPanX,CROP_DISP/2+cPanY);
+  cctx.rotate(cRot*Math.PI/180);
+  cctx.scale(cBase*cScale,cBase*cScale);
+  cctx.drawImage(cImg,-cImg.width/2,-cImg.height/2);
+  cctx.restore();
+}
+function exportCrop(){
+  const oc=document.createElement("canvas");
+  oc.width=CROP_OUT;oc.height=CROP_OUT;
+  const octx=oc.getContext("2d");
+  const k=CROP_OUT/CROP_DISP;
+  octx.fillStyle="#fff";octx.fillRect(0,0,CROP_OUT,CROP_OUT);
+  octx.save();
+  octx.translate(CROP_OUT/2+cPanX*k,CROP_OUT/2+cPanY*k);
+  octx.rotate(cRot*Math.PI/180);
+  octx.scale(cBase*cScale*k,cBase*cScale*k);
+  octx.drawImage(cImg,-cImg.width/2,-cImg.height/2);
+  octx.restore();
+  return oc.toDataURL("image/jpeg",.85);
+}
+function closeCropper(){
+  $("#cropModal").classList.remove("on");
+  document.body.style.overflow=$("#sheetEdit").classList.contains("on")?"hidden":"";
+  cImg=null;
+}
+cropCanvas.addEventListener("pointerdown",e=>{
+  if(!cImg)return;
+  cDrag=true;cLastX=e.clientX;cLastY=e.clientY;
+  cropCanvas.setPointerCapture(e.pointerId);cropCanvas.style.cursor="grabbing";
+});
+cropCanvas.addEventListener("pointermove",e=>{
+  if(!cDrag)return;
+  const sc=CROP_DISP/cropCanvas.clientWidth;
+  cPanX+=(e.clientX-cLastX)*sc;cPanY+=(e.clientY-cLastY)*sc;
+  cLastX=e.clientX;cLastY=e.clientY;drawCrop();
+});
+function endDrag(){cDrag=false;cropCanvas.style.cursor="grab";}
+cropCanvas.addEventListener("pointerup",endDrag);
+cropCanvas.addEventListener("pointercancel",endDrag);
+$("#cropZoom").addEventListener("input",e=>{cScale=Number(e.target.value)/100;drawCrop();});
+$("#cropRotate").addEventListener("click",()=>{cRot=(cRot+90)%360;drawCrop();});
+$("#cropCancel").addEventListener("click",closeCropper);
+$("#cropApply").addEventListener("click",()=>{
+  if(!cImg)return;
+  draftPhoto=exportCrop();
+  updatePhotoBox();
+  closeCropper();
+});
+
+/* =========================================================
+   GUEST VIEW  (주인장 인형 읽기 전용 구경)
+   ========================================================= */
+$("#guestViewBtn").addEventListener("click",enterGuestView);
+
+async function enterGuestView(){
+  readOnly=true;
+  showApp();
+  $("#roBanner").hidden=false;
+  $("#fabWrap").hidden=true;
+  $("#acctEmail").textContent="주인장님의 인형 컬렉션";
+  $(".top .hi").textContent="구경 모드";
+  $("#btnLogout").textContent="←";
+  $("#btnLogout").title="로그인 화면으로";
+  await loadOwnerDolls();
+}
+function exitGuestView(){
+  readOnly=false;
+  dolls=[];
+  filter="all";searchQuery="";categoryFilter="all";priceFilter="all";sortMode="new";
+  $("#searchInput").value="";$("#searchClear").hidden=true;
+  $("#roBanner").hidden=true;
+  $("#btnLogout").textContent="⏻";$("#btnLogout").title="로그아웃";
+  $(".top .hi").textContent="오늘도 하나 뽑으셨나요?";
+  showAuth();
+}
+async function loadOwnerDolls(){
+  const{data,error}=await sb.from("dolls").select("*")
+    .eq("user_id",OWNER_ID).order("created_at",{ascending:false});
+  if(error){toast("불러오기 실패: "+error.message);return;}
+  dolls=(data||[]).map(rowToDoll);
+  if(!dolls.length){
+    toast("공개된 인형이 없어요 (또는 읽기 정책 미설정)");
+  }
+  render();
+}
 
 /* ---------- Init ---------- */
 if(CONFIGURED){
