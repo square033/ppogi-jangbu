@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>뽑기 장부</title>
+<title>🧸🌀뽑기 장부</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -29,6 +29,7 @@
     --shadow:0 1px 3px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.04);
     --radius:20px;
     --safe-b:env(safe-area-inset-bottom,0px);
+    --content-max:480px;   /* 화면 폭에 따라 아래 미디어쿼리에서 넓어짐 */
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;}
@@ -42,11 +43,11 @@
   }
   button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;letter-spacing:-.01em;}
   input{font-family:inherit;letter-spacing:-.01em;}
-  .app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:120px;}
+  .app{max-width:var(--content-max);margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:120px;}
 
   /* ---------- Auth screen ---------- */
   .auth-wrap{
-    min-height:100vh;max-width:480px;margin:0 auto;display:flex;flex-direction:column;
+    min-height:100vh;max-width:min(var(--content-max),480px);margin:0 auto;display:flex;flex-direction:column;
     justify-content:center;padding:24px 28px;background:var(--bg);
   }
   .auth-logo{font-size:44px;text-align:center;margin-bottom:8px;}
@@ -155,6 +156,20 @@
 
   /* Grid */
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 20px 0;}
+
+  /* ---------- Wider screens: use more of the width ---------- */
+  @media (min-width:560px){
+    :root{--content-max:720px;}
+    .grid{grid-template-columns:repeat(3,1fr);}
+  }
+  @media (min-width:900px){
+    :root{--content-max:960px;}
+    .grid{grid-template-columns:repeat(4,1fr);}
+  }
+  @media (min-width:1200px){
+    :root{--content-max:1180px;}
+    .grid{grid-template-columns:repeat(5,1fr);}
+  }
   .doll{
     background:var(--card);border-radius:18px;overflow:hidden;box-shadow:var(--shadow);
     transition:transform .12s ease;text-align:left;width:100%;display:block;
@@ -186,7 +201,7 @@
   /* Floating add */
   .fab{
     position:fixed;bottom:calc(24px + var(--safe-b));left:50%;transform:translateX(-50%);
-    max-width:480px;width:calc(100% - 40px);z-index:40;
+    max-width:var(--content-max);width:calc(100% - 40px);z-index:40;
   }
   .fab button{
     width:100%;height:56px;border-radius:16px;background:var(--blue);color:#fff;
@@ -201,7 +216,7 @@
   .scrim.on{opacity:1;pointer-events:auto;}
   .sheet{
     position:fixed;left:50%;bottom:0;transform:translate(-50%,100%);
-    max-width:480px;width:100%;background:var(--card);z-index:60;
+    max-width:min(var(--content-max),560px);width:100%;background:var(--card);z-index:60;
     border-radius:24px 24px 0 0;transition:transform .3s cubic-bezier(.2,.8,.2,1);
     max-height:92vh;display:flex;flex-direction:column;
   }
@@ -309,7 +324,7 @@
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
 
   /* Config warning screen */
-  .cfg-warn{max-width:480px;margin:60px auto;padding:0 24px;text-align:center;}
+  .cfg-warn{max-width:min(var(--content-max),480px);margin:60px auto;padding:0 24px;text-align:center;}
   .cfg-warn .ic{font-size:44px;}
   .cfg-warn h2{font-size:19px;font-weight:800;margin-top:14px;}
   .cfg-warn p{font-size:14px;color:var(--text-sub);margin-top:10px;line-height:1.6;}
