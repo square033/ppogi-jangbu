@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>🧸🌀뽑기 장부</title>
+<title>뽑기 장부</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -284,9 +284,32 @@
   .sell-link .sl-arrow{font-size:18px;opacity:.6;}
 
   /* Selling badge on card */
-  .badge.selling{
-    position:absolute;top:10px;right:10px;left:auto;background:var(--blue);color:#fff;
+  /* Sale-status badges (top-right of thumbnail) */
+  .badge.st{position:absolute;top:10px;right:10px;left:auto;}
+  .badge.st-selling{background:var(--blue);color:#fff;}
+  .badge.st-sold{background:rgba(0,0,0,.62);color:#fff;}
+  .badge.st-unsold{background:rgba(255,255,255,.85);color:var(--text-sub);}
+  .doll.is-sold .thumb img{opacity:.5;}
+  .doll.is-sold .thumb .noimg{opacity:.5;}
+
+  /* Status filter row */
+  .statusfilter{display:flex;gap:8px;padding:12px 20px 0;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .statusfilter::-webkit-scrollbar{display:none;}
+  .statusfilter .sf{
+    flex:0 0 auto;padding:8px 14px;border-radius:999px;background:var(--card);
+    box-shadow:var(--shadow);font-size:13px;font-weight:700;color:var(--text-sub);
   }
+  .statusfilter .sf.on{background:var(--text);color:#fff;}
+  .statusfilter .sf .cnt{opacity:.55;margin-left:3px;}
+
+  /* Status pill inside detail sheet */
+  .detail-status{
+    display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:7px 14px;
+    border-radius:999px;font-size:13px;font-weight:800;
+  }
+  .detail-status.selling{background:var(--blue-soft);color:var(--blue);}
+  .detail-status.sold{background:rgba(0,0,0,.06);color:var(--text-sub);}
+  .detail-status.unsold{background:var(--green-soft);color:var(--green);}
 
   /* Save / actions */
   .actions{display:flex;gap:10px;margin-top:26px;}
@@ -451,6 +474,13 @@
 
   <div class="tabs cat-tabs" id="catTabs"></div>
 
+  <div class="statusfilter" id="statusFilter">
+    <button class="sf on" data-st="all">전체</button>
+    <button class="sf" data-st="unsold">미판매 <span class="cnt" id="sf-unsold">0</span></button>
+    <button class="sf" data-st="selling">판매중 <span class="cnt" id="sf-selling">0</span></button>
+    <button class="sf" data-st="sold">판매완료 <span class="cnt" id="sf-sold">0</span></button>
+  </div>
+
   <div class="filterrow">
     <div class="selwrap">
       <select id="sortSel" aria-label="정렬">
@@ -540,6 +570,15 @@
       <input class="inp" id="linkInput" type="url" placeholder="지금 판매 중이라면 그 글 링크를 붙여넣으세요" autocomplete="off" inputmode="url" />
     </div>
 
+    <div class="field">
+      <label>판매 상태</label>
+      <div class="sizes" id="statusSel">
+        <button data-status="unsold">미판매</button>
+        <button data-status="selling">판매중</button>
+        <button data-status="sold">판매완료</button>
+      </div>
+    </div>
+
     <div class="actions">
       <button class="btn ghost" id="btnDelete" style="display:none;" title="삭제" aria-label="삭제">🗑</button>
       <button class="btn primary" id="btnSave" disabled>저장하기</button>
@@ -556,6 +595,7 @@
     <div class="detail-name" id="detailName"></div>
     <div class="detail-meta" id="detailMeta"></div>
     <div class="detail-price" id="detailPrice"></div>
+    <div id="detailStatus" class="detail-status"></div>
     <div class="detail-date" id="detailDate"></div>
 
     <div id="sellLinkBox" class="sell-link" hidden>
@@ -630,6 +670,7 @@ const sb = CONFIGURED ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) :
 const $=s=>document.querySelector(s);
 const fmt=n=>Number(n).toLocaleString("ko-KR");
 const sizeLabel={small:"소형",medium:"중형",large:"대형"};
+const statusLabel={unsold:"미판매",selling:"판매중",sold:"판매완료"};
 const emojiFor=s=>({small:"🧸",medium:"🐻",large:"🐰"}[s]||"🧸");
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
 function toast(msg){
@@ -643,10 +684,12 @@ let filter="all";
 let searchQuery="";
 let categoryFilter="all";
 let priceFilter="all";
+let statusFilter="all";
 let sortMode="new";
 let editingId=null;
 let draftPhoto=null;
 let draftSize=null;
+let draftStatus="unsold";
 let draftCategory="";
 let detailId=null;
 let session=null;
@@ -799,7 +842,7 @@ async function loadDolls(){
   render();
 }
 function rowToDoll(r){
-  return {id:r.id,name:r.name,size:r.size,price:r.price,photo:r.photo,category:r.category||"",sellLink:r.sell_link||"",createdAt:Number(r.created_at)};
+  return {id:r.id,name:r.name,size:r.size,price:r.price,photo:r.photo,category:r.category||"",sellLink:r.sell_link||"",status:r.status||"unsold",createdAt:Number(r.created_at)};
 }
 
 async function saveDoll(){
@@ -819,7 +862,7 @@ async function saveDoll(){
   try{
     if(editingId){
       const{error}=await sb.from("dolls").update({
-        name,size:draftSize,price,photo:draftPhoto||null,category:category||null,sell_link:sellLink||null
+        name,size:draftSize,price,photo:draftPhoto||null,category:category||null,sell_link:sellLink||null,status:draftStatus
       }).eq("id",editingId);
       if(error)throw error;
     }else{
@@ -830,6 +873,7 @@ async function saveDoll(){
         photo: draftPhoto||null,
         category: category||null,
         sell_link: sellLink||null,
+        status: draftStatus,
         created_at: Date.now()
       });
       if(error)throw error;
@@ -918,11 +962,21 @@ function render(){
   // category tabs
   renderCatTabs();
 
+  // status filter counts
+  const statusOf=d=>d.status||"unsold";
+  $("#sf-unsold").textContent=dolls.filter(d=>statusOf(d)==="unsold").length;
+  $("#sf-selling").textContent=dolls.filter(d=>statusOf(d)==="selling").length;
+  $("#sf-sold").textContent=dolls.filter(d=>statusOf(d)==="sold").length;
+  document.querySelectorAll("#statusFilter .sf").forEach(b=>{
+    b.classList.toggle("on", b.dataset.st===statusFilter);
+  });
+
   // apply filters
   const q=searchQuery.trim().toLowerCase();
   let list=dolls.filter(d=>{
     if(filter!=="all"&&d.size!==filter)return false;
     if(categoryFilter!=="all"&&d.category!==categoryFilter)return false;
+    if(statusFilter!=="all"&&statusOf(d)!==statusFilter)return false;
     if(!inPriceRange(d))return false;
     if(q&&!d.name.toLowerCase().includes(q))return false;
     return true;
@@ -941,12 +995,14 @@ function render(){
       ? `<div class="pr">${fmt(d.price)}원</div>`
       : `<div class="pr none">가격 미정</div>`;
     const catHtml = d.category ? `<div class="dcat">${escapeHtml(d.category)}</div>` : "";
-    const sellBadge = d.sellLink ? `<div class="badge selling">판매중</div>` : "";
+    const st = d.status||"unsold";
+    const statusBadge = `<div class="badge st st-${st}">${statusLabel[st]}</div>`;
+    if(st==="sold") el.classList.add("is-sold");
     el.innerHTML=`
       <div class="thumb">
         ${d.photo?`<img src="${d.photo}" alt="${escapeHtml(d.name)}" loading="lazy">`:`<div class="noimg">${emojiFor(d.size)}</div>`}
         <div class="badge ${d.size}">${sizeLabel[d.size]}</div>
-        ${sellBadge}
+        ${statusBadge}
       </div>
       <div class="body">
         ${catHtml}
@@ -965,6 +1021,7 @@ function openEdit(doll){
   editingId = doll?doll.id:null;
   draftPhoto = doll?doll.photo:null;
   draftSize = doll?doll.size:null;
+  draftStatus = doll?(doll.status||"unsold"):"unsold";
   draftCategory = doll?(doll.category||""):"";
   $("#editTitle").textContent = doll?"인형 수정":"인형 추가";
   $("#nameInput").value = doll?doll.name:"";
@@ -974,6 +1031,7 @@ function openEdit(doll){
   $("#btnDelete").style.display = doll?"flex":"none";
   updatePhotoBox();
   updateSizeSel();
+  updateStatusSel();
   renderCatChips();
   updateMarketLinks();
   validate();
@@ -1011,6 +1069,11 @@ function updateSizeSel(){
     b.classList.toggle("on", b.dataset.size===draftSize);
   });
 }
+function updateStatusSel(){
+  document.querySelectorAll("#statusSel button").forEach(b=>{
+    b.classList.toggle("on", b.dataset.status===draftStatus);
+  });
+}
 function updateMarketLinks(){
   const name=$("#nameInput").value.trim();
   const b=$("#lnkBunjang"), d=$("#lnkDaangn");
@@ -1046,6 +1109,10 @@ function openDetail(id){
   }
   const dt=new Date(d.createdAt);
   $("#detailDate").textContent=`${dt.getFullYear()}. ${dt.getMonth()+1}. ${dt.getDate()} 등록`;
+  const st=d.status||"unsold";
+  const stEmoji={unsold:"🏷️",selling:"🔵",sold:"✅"}[st];
+  $("#detailStatus").className="detail-status "+st;
+  $("#detailStatus").textContent=`${stEmoji} ${statusLabel[st]}`;
   $("#dLnkBunjang").href=bunjangUrl(d.name);
   $("#dLnkDaangn").href=daangnUrl(d.name);
   if(d.sellLink){
@@ -1088,6 +1155,9 @@ $("#catInput").addEventListener("input",()=>{
 document.querySelectorAll("#sizeSel button").forEach(b=>{
   b.addEventListener("click",()=>{draftSize=b.dataset.size;updateSizeSel();validate();});
 });
+document.querySelectorAll("#statusSel button").forEach(b=>{
+  b.addEventListener("click",()=>{draftStatus=b.dataset.status;updateStatusSel();});
+});
 $("#priceInput").addEventListener("input",e=>{
   let v=e.target.value.replace(/[^0-9]/g,"");
   e.target.value = v===""?"":fmt(Number(v));
@@ -1122,6 +1192,11 @@ $("#searchClear").addEventListener("click",()=>{
 /* sort & price filter */
 $("#sortSel").addEventListener("change",e=>{sortMode=e.target.value;render();});
 $("#priceSel").addEventListener("change",e=>{priceFilter=e.target.value;render();});
+
+/* status filter */
+document.querySelectorAll("#statusFilter .sf").forEach(b=>{
+  b.addEventListener("click",()=>{statusFilter=b.dataset.st;render();});
+});
 
 $("#scrimEdit").addEventListener("click",()=>hideSheet("Edit"));
 $("#scrimDetail").addEventListener("click",()=>hideSheet("Detail"));
@@ -1236,7 +1311,7 @@ async function enterGuestView(){
 function exitGuestView(){
   readOnly=false;
   dolls=[];
-  filter="all";searchQuery="";categoryFilter="all";priceFilter="all";sortMode="new";
+  filter="all";searchQuery="";categoryFilter="all";priceFilter="all";statusFilter="all";sortMode="new";
   $("#searchInput").value="";$("#searchClear").hidden=true;
   $("#roBanner").hidden=true;
   $("#btnLogout").textContent="⏻";$("#btnLogout").title="로그아웃";
